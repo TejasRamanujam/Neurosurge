@@ -109,7 +109,7 @@ def get_note(note_id: int, db: Session = Depends(get_db)):
         content=note.content,
         created_at=note.created_at,
         updated_at=note.updated_at,
-        tags=node_tags.get(note_id, []),
+        tags=node_tags.get(note_id) or extract_tags(note.content),
         backlinks=backlinks,
         suggestions=suggestions,
         flashcards=[FlashcardResponse.model_validate(f) for f in flashcards],
@@ -184,8 +184,16 @@ def create_link(source_id: int = Query(...), target_id: int = Query(...), weight
 
 
 @app.get("/api/tags")
-def list_tags():
-    return neo4j_client.get_all_tags()
+def list_tags(db: Session = Depends(get_db)):
+    tags = neo4j_client.get_all_tags()
+    if tags:
+        return tags
+    # Fall back to hashtags parsed from note content when the graph DB is unavailable.
+    seen = set()
+    for note in db.query(Note).all():
+        for t in extract_tags(note.content):
+            seen.add(t)
+    return sorted(seen)
 
 
 @app.get("/api/backlinks/{note_id}")
