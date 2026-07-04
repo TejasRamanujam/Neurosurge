@@ -1,0 +1,9 @@
+fastapi>=0.115
+sqlalchemy>=2.0
+psycopg[binary]>=3.2
+pydantic>=2.9
+pydantic-settings>=2.5
+pgvector>=0.3
+neo4j>=5.25
+openai>=1.51
+python-multipart>=0.0.9

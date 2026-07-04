@@ -33,14 +33,21 @@ export default function FlashcardReview() {
     } catch (err) { console.error(err) }
   }, [cards, index])
 
-  if (loading) return <div className="loading"><div className="spinner" /></div>
+  if (loading) {
+    return (
+      <div aria-busy="true">
+        <div className="flashcard-progress"><span>Loading due cards...</span></div>
+        <div className="skeleton skeleton-card" />
+      </div>
+    )
+  }
 
   if (done) {
     return (
       <div className="empty-state">
         <div className="icon">✓</div>
         <h3>All caught up!</h3>
-        <p>You've reviewed all due cards.</p>
+        <p>You've reviewed every card that's due. Your memory graph thanks you.</p>
         <div className="flashcard-progress">
           <span>{stats.reviewed_today} reviewed today</span>
           <span>·</span>
@@ -81,8 +88,8 @@ export default function FlashcardReview() {
           <button className="rating-btn r5" onClick={() => handleRate(5)} title="Perfect">5</button>
         </div>
       )}
-      <div style={{ marginTop: 16, height: 3, background: 'var(--border)', borderRadius: 2, overflow: 'hidden' }}>
-        <div style={{ width: `${(index / cards.length) * 100}%`, height: '100%', background: 'var(--accent)', borderRadius: 2, transition: 'width 0.3s' }} />
+      <div className="review-progress-track">
+        <div className="review-progress-fill" style={{ width: `${(index / cards.length) * 100}%` }} />
       </div>
     </div>
   )

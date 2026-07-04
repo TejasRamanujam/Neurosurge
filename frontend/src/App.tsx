@@ -22,6 +22,25 @@ function NoteIcon() {
   return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
 }
 
+function NeuralLogo({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 100 100" fill="none" aria-hidden="true">
+      <line x1="50" y1="50" x2="78" y2="24" stroke="#7c5cff" strokeWidth="2.5" opacity="0.5" />
+      <line x1="50" y1="50" x2="22" y2="30" stroke="#4cc9f0" strokeWidth="2.5" opacity="0.5" />
+      <line x1="50" y1="50" x2="30" y2="78" stroke="#7c5cff" strokeWidth="2.5" opacity="0.5" />
+      <line x1="50" y1="50" x2="76" y2="72" stroke="#4cc9f0" strokeWidth="2.5" opacity="0.5" />
+      <line x1="78" y1="24" x2="76" y2="72" stroke="#7c5cff" strokeWidth="1.5" opacity="0.25" />
+      <line x1="22" y1="30" x2="30" y2="78" stroke="#4cc9f0" strokeWidth="1.5" opacity="0.25" />
+      <circle cx="50" cy="50" r="13" fill="#7c5cff" />
+      <circle cx="50" cy="50" r="19" stroke="#7c5cff" strokeWidth="1.5" opacity="0.35" />
+      <circle className="pulse" cx="78" cy="24" r="7" fill="#4cc9f0" />
+      <circle className="pulse" cx="22" cy="30" r="5.5" fill="#7c5cff" style={{ animationDelay: '0.6s' }} />
+      <circle className="pulse" cx="30" cy="78" r="6.5" fill="#4cc9f0" style={{ animationDelay: '1.2s' }} />
+      <circle className="pulse" cx="76" cy="72" r="5" fill="#7c5cff" style={{ animationDelay: '1.8s' }} />
+    </svg>
+  )
+}
+
 function FileUploadZone({ onUploaded }: { onUploaded: () => void }) {
   const [dragging, setDragging] = useState(false)
   const [uploading, setUploading] = useState(false)
@@ -69,6 +88,7 @@ export default function App() {
   const [rightTab, setRightTab] = useState<RightTab>('backlinks')
   const [showUpload, setShowUpload] = useState(false)
   const [formatting, setFormatting] = useState(false)
+  const [notesLoading, setNotesLoading] = useState(true)
 
   useEffect(() => { loadNotes() }, [searchQuery])
 
@@ -77,6 +97,7 @@ export default function App() {
       const data = await fetchNotes(searchQuery)
       setNotes(data)
     } catch (err) { console.error(err) }
+    setNotesLoading(false)
   }
 
   async function loadDetail(id: number) {
@@ -158,21 +179,17 @@ export default function App() {
       {/* Title Bar */}
       <div className="titlebar">
         <div className="titlebar-logo">
-          <svg viewBox="0 0 100 100">
-            <circle cx="50" cy="50" r="48" fill="var(--accent)" />
-            <text x="50" y="54" textAnchor="middle" dominantBaseline="middle" fontSize="36" fontWeight="bold" fill="white" fontFamily="Inter">N</text>
-            <circle cx="72" cy="28" r="8" fill="#9b7ffd" stroke="white" strokeWidth="2"/>
-            <circle cx="28" cy="72" r="6" fill="#4caf50" stroke="white" strokeWidth="2"/>
-            <line x1="72" y1="28" x2="50" y2="50" stroke="white" strokeWidth="1.5" opacity="0.4"/>
-            <line x1="50" y1="50" x2="28" y2="72" stroke="white" strokeWidth="1.5" opacity="0.4"/>
-          </svg>
-          Neurosurge
+          <NeuralLogo />
+          <span>Neurosurge</span>
         </div>
-        <div className="titlebar-tabs">
+        <nav className="titlebar-tabs" aria-label="Main views">
           <button className={`titlebar-tab${tab === 'notes' ? ' active' : ''}`} onClick={() => setTab('notes')}>Notes</button>
           <button className={`titlebar-tab${tab === 'graph' ? ' active' : ''}`} onClick={() => setTab('graph')}>Graph</button>
           <button className={`titlebar-tab${tab === 'flashcards' ? ' active' : ''}`} onClick={() => setTab('flashcards')}>Flashcards</button>
-        </div>
+        </nav>
+        <a className="back-pill" href="https://tejas-live-demos.vercel.app">
+          &larr;<span className="back-label"> Back to demos</span>
+        </a>
       </div>
 
       {/* Body */}
@@ -194,7 +211,15 @@ export default function App() {
           </div>
 
           <div className="file-list">
-            {filteredNotes.map((note) => (
+            {notesLoading && (
+              <div className="skeleton-list" aria-hidden="true">
+                <div className="skeleton skeleton-line" />
+                <div className="skeleton skeleton-line w80" />
+                <div className="skeleton skeleton-line" />
+                <div className="skeleton skeleton-line w60" />
+              </div>
+            )}
+            {!notesLoading && filteredNotes.map((note) => (
               <button
                 key={note.id}
                 className={`file-item${selectedId === note.id ? ' active' : ''}`}
@@ -204,9 +229,9 @@ export default function App() {
                 {note.title || 'Untitled'}
               </button>
             ))}
-            {filteredNotes.length === 0 && (
-              <div style={{ padding: 16, textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>
-                {searchQuery ? 'No matching files' : 'No notes yet'}
+            {!notesLoading && filteredNotes.length === 0 && (
+              <div className="panel-empty">
+                <p>{searchQuery ? 'No notes match your search.' : 'No notes yet — create your first one below.'}</p>
               </div>
             )}
           </div>
@@ -228,8 +253,9 @@ export default function App() {
             {/* Notes / Editor */}
             {tab === 'notes' && !selectedId && (
               <div className="welcome-view">
+                <NeuralLogo className="neural-mark" />
                 <h1>Welcome to Neurosurge</h1>
-                <p>Your second brain. Select a note from the sidebar or create a new one.</p>
+                <p>Your second brain. Capture notes, connect ideas, and let the graph grow as you think.</p>
                 <button className="sidebar-btn primary" onClick={handleCreateNote}>+ Create your first note</button>
               </div>
             )}
@@ -251,9 +277,13 @@ export default function App() {
                     Close
                   </button>
                   <button className="editor-btn danger" onClick={handleDelete}>Delete</button>
-                  <span style={{ fontSize: 12, color: 'var(--text-muted)', marginLeft: 'auto' }}>
-                    {detail.tags.map((t) => `#${t}`).join(' ')}
-                  </span>
+                  {detail.tags.length > 0 && (
+                    <span className="note-tags">
+                      {detail.tags.map((t) => (
+                        <span key={t} className="tag-chip">#{t}</span>
+                      ))}
+                    </span>
+                  )}
                 </div>
 
                 <input
