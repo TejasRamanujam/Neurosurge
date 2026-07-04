@@ -7,6 +7,15 @@ interface D3Node extends GraphNode { x?: number; y?: number }
 interface D3Edge extends GraphEdge { source: number; target: number }
 interface GraphData { nodes: D3Node[]; links: D3Edge[] }
 
+const ACCENT = '#7c5cff'
+const ACCENT_LIGHT = '#937aff'
+const CYAN = '#4cc9f0'
+const TAG_COLORS: Record<string, string> = {
+  'ml/ai': '#52d29a', ai: '#52d29a', productivity: '#ffb454',
+  'full-stack': CYAN, knowledge: ACCENT, graph: '#c77dff',
+  backend: '#2ec4b6', security: '#ff6b7a', cloud: CYAN,
+}
+
 export default function KnowledgeGraphView({
   onSelectNote,
   highlightNoteId,
@@ -16,19 +25,24 @@ export default function KnowledgeGraphView({
 }) {
   const [data, setData] = useState<GraphData>({ nodes: [], links: [] })
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
   const [hovered, setHovered] = useState<number | null>(null)
   const fgRef = useRef<any>(null)
 
   useEffect(() => { loadGraph() }, [])
 
   async function loadGraph() {
+    setError(false)
     try {
       const g: KnowledgeGraph = await fetchGraph()
       setData({
         nodes: g.nodes.map((n) => ({ ...n })),
         links: g.edges.map((e) => ({ ...e, source: e.source as number, target: e.target as number })),
       })
-    } catch (err) { console.error(err) }
+    } catch (err) {
+      console.error(err)
+      setError(true)
+    }
     setLoading(false)
   }
 
@@ -44,13 +58,24 @@ export default function KnowledgeGraphView({
     if (highlightNoteId) handleZoomTo(highlightNoteId)
   }, [highlightNoteId, data])
 
-  if (loading) return <div className="loading"><div className="spinner" /></div>
+  if (loading) return <div className="loading"><div className="spinner" />Mapping your knowledge graph...</div>
+
+  if (error) {
+    return (
+      <div className="empty-state">
+        <h3>Graph service is offline</h3>
+        <p>The knowledge graph needs its backing graph database, which isn't reachable right now. Your notes are safe — try again in a moment.</p>
+        <button className="graph-btn" onClick={loadGraph}>Try again</button>
+      </div>
+    )
+  }
 
   if (data.nodes.length === 0) {
     return (
-      <div className="welcome-view">
-        <h1>No connections yet</h1>
-        <p>Create notes and the graph will automatically build as you add content.</p>
+      <div className="empty-state">
+        <h3>No connections yet</h3>
+        <p>Create notes and link ideas — the graph builds itself as your second brain grows.</p>
+        <button className="graph-btn" onClick={loadGraph}>Refresh</button>
       </div>
     )
   }
@@ -77,26 +102,19 @@ export default function KnowledgeGraphView({
           nodeLabel={(n: any) => n.title}
           nodeVal={(n: any) => Math.max(5, Math.min(22, (n.connection_count || 0) * 3 + 6))}
           nodeColor={(n: any) => {
-            if (n.id === highlightNoteId) return '#6c8cff'
-            if (n.id === hovered) return '#8aa4ff'
-            if (n.tags?.length) {
-              const map: Record<string, string> = {
-                'ml/ai': '#4caf50', ai: '#4caf50', productivity: '#ff9800',
-                'full-stack': '#42a5f5', knowledge: '#6c8cff', graph: '#ab47bc',
-                backend: '#26a69a', security: '#ef5350', cloud: '#42a5f5',
-              }
-              return map[n.tags[0].toLowerCase()] || '#6c8cff'
-            }
-            return '#6c8cff'
+            if (n.id === highlightNoteId) return ACCENT
+            if (n.id === hovered) return ACCENT_LIGHT
+            if (n.tags?.length) return TAG_COLORS[n.tags[0].toLowerCase()] || ACCENT
+            return ACCENT
           }}
           linkWidth={(l: any) => Math.max(0.3, (l.weight || 1) * 1.5)}
-          linkColor={() => 'rgba(108, 140, 255, 0.12)'}
+          linkColor={() => 'rgba(124, 92, 255, 0.16)'}
           linkDirectionalParticles={(l: any) => (l.source === highlightNoteId || l.target === highlightNoteId) ? 2 : 0}
           linkDirectionalParticleWidth={2}
-          linkDirectionalParticleColor={() => '#6c8cff'}
+          linkDirectionalParticleColor={() => CYAN}
           onNodeClick={(n: any) => onSelectNote(n.id)}
           onNodeHover={(n: any) => setHovered(n?.id ?? null)}
-          backgroundColor="#1e1e1e"
+          backgroundColor="rgba(0,0,0,0)"
           d3AlphaDecay={0.015}
           d3VelocityDecay={0.25}
           cooldownTicks={120}
@@ -111,22 +129,17 @@ export default function KnowledgeGraphView({
             ctx.beginPath()
             ctx.arc(node.x, node.y, r, 0, 2 * Math.PI)
             const tag = node.tags?.[0]?.toLowerCase() || ''
-            const map: Record<string, string> = {
-              'ml/ai': '#4caf50', ai: '#4caf50', productivity: '#ff9800',
-              'full-stack': '#42a5f5', knowledge: '#6c8cff', graph: '#ab47bc',
-              backend: '#26a69a', security: '#ef5350', cloud: '#42a5f5',
-            }
-            ctx.fillStyle = map[tag] || '#6c8cff'
+            ctx.fillStyle = TAG_COLORS[tag] || ACCENT
             ctx.globalAlpha = alpha
             ctx.fill()
 
             if (isHighlight) {
-              ctx.strokeStyle = '#8aa4ff'
+              ctx.strokeStyle = CYAN
               ctx.lineWidth = 2.5 / globalScale
               ctx.stroke()
               ctx.beginPath()
               ctx.arc(node.x, node.y, r + 5 / globalScale, 0, 2 * Math.PI)
-              ctx.strokeStyle = 'rgba(108, 140, 255, 0.2)'
+              ctx.strokeStyle = 'rgba(124, 92, 255, 0.25)'
               ctx.lineWidth = 2 / globalScale
               ctx.stroke()
             }
@@ -134,7 +147,7 @@ export default function KnowledgeGraphView({
             if (isHover || isHighlight || globalScale > 0.5) {
               const fontSize = Math.max(11, 13 / globalScale)
               ctx.font = `${fontSize}px Inter, sans-serif`
-              ctx.fillStyle = '#d4d4d4'
+              ctx.fillStyle = '#a4a9c0'
               ctx.textAlign = 'center'
               ctx.textBaseline = 'top'
               ctx.globalAlpha = 1

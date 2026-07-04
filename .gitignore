@@ -6,3 +6,9 @@ build/
 __pycache__/
 *.db
 .vite/
+.vercel
+.env*
+*.tsbuildinfo
+__pycache__/
+*.pyc
+.vercel/
