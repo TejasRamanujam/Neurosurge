@@ -1,8 +1,10 @@
 import io
 import logging
 import re
+import zipfile
 from pathlib import Path
 from typing import Optional
+from xml.etree import ElementTree
 
 logger = logging.getLogger("neurosurge.parsing")
 
@@ -20,6 +22,11 @@ try:
     from pdfminer.high_level import extract_text as pdfminer_extract
 except ImportError:
     pdfminer_extract = None
+
+try:
+    from pypdf import PdfReader
+except ImportError:
+    PdfReader = None
 
 
 def _clean_control_chars(text: str) -> str:
@@ -82,6 +89,18 @@ def extract_text_from_pdf(content: bytes) -> Optional[str]:
             logger.info("fitz extracted %d chars", len(text))
             return text
 
+    if PdfReader is not None:
+        try:
+            reader = PdfReader(io.BytesIO(content))
+            pages = [(page.extract_text() or "") for page in reader.pages]
+            text = _clean_control_chars("\n".join(pages))
+            text = re.sub(r"\n{3,}", "\n\n", text).strip()
+            if len(text) >= 10:
+                logger.info("pypdf extracted %d chars", len(text))
+                return text
+        except Exception as e:
+            logger.warning("pypdf failed: %s", e)
+
     if pdfminer_extract is not None:
         try:
             text = pdfminer_extract(io.BytesIO(content))
@@ -95,17 +114,38 @@ def extract_text_from_pdf(content: bytes) -> Optional[str]:
     return None
 
 
-def extract_text_from_docx(content: bytes) -> Optional[str]:
-    if Document is None:
-        return None
+_DOCX_NS = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
+
+
+def _extract_docx_stdlib(content: bytes) -> Optional[str]:
+    """Parse .docx (a zip of XML) with the standard library only."""
     try:
-        doc = Document(io.BytesIO(content))
-        texts = [p.text for p in doc.paragraphs if p.text.strip()]
-        result = "\n".join(texts)
-        return result if result.strip() else None
+        with zipfile.ZipFile(io.BytesIO(content)) as z:
+            xml = z.read("word/document.xml")
+        root = ElementTree.fromstring(xml)
+        paragraphs = []
+        for p in root.iter(f"{_DOCX_NS}p"):
+            run_text = "".join(t.text or "" for t in p.iter(f"{_DOCX_NS}t"))
+            if run_text.strip():
+                paragraphs.append(run_text)
+        result = "\n".join(paragraphs).strip()
+        return result if result else None
     except Exception as e:
-        logger.warning("DOCX extraction failed: %s", e)
-    return None
+        logger.warning("stdlib DOCX extraction failed: %s", e)
+        return None
+
+
+def extract_text_from_docx(content: bytes) -> Optional[str]:
+    if Document is not None:
+        try:
+            doc = Document(io.BytesIO(content))
+            texts = [p.text for p in doc.paragraphs if p.text.strip()]
+            result = "\n".join(texts)
+            if result.strip():
+                return result
+        except Exception as e:
+            logger.warning("python-docx extraction failed: %s", e)
+    return _extract_docx_stdlib(content)
 
 
 def extract_text_from_doc(content: bytes) -> Optional[str]:
