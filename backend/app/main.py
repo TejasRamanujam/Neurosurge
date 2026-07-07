@@ -10,7 +10,6 @@ from fastapi import FastAPI, Depends, Query, HTTPException, UploadFile, File, Bo
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import func, or_, text
 from sqlalchemy.orm import Session
-import re
 
 from app.database import get_db, engine, Base
 from app.models import Note, Flashcard
@@ -20,10 +19,10 @@ from app.schemas import (
     Suggestion, FlashcardCreate, FlashcardReview, FlashcardResponse,
     SearchResult, Backlink,
 )
-from app.neo4j_client import neo4j_client
+from app import graph_service
 from app.embedding_service import update_note_embedding
 from app.spaced_repetition import review_flashcard, get_due_flashcards, get_flashcard_stats
-from app.suggestion_engine import get_semantic_suggestions
+from app.suggestion_engine import get_semantic_suggestions, semantic_search
 from app.parsing_service import extract_text_from_file, SUPPORTED_EXTENSIONS
 from app.formatting_service import format_for_readability
 
@@ -35,7 +34,6 @@ async def lifespan(app: FastAPI):
         conn.commit()
     Base.metadata.create_all(bind=engine)
     yield
-    neo4j_client.close()
 
 
 app = FastAPI(title="Neurosurge — Personal Knowledge Graph & Second Brain", lifespan=lifespan)
@@ -90,12 +88,7 @@ def get_note(note_id: int, db: Session = Depends(get_db)):
     if not note:
         raise HTTPException(status_code=404, detail="Note not found")
 
-    graph = neo4j_client.get_knowledge_graph()
-    node_tags = {}
-    for n in graph["nodes"]:
-        node_tags[n["id"]] = n["tags"]
-
-    backlinks_raw = neo4j_client.get_backlinks(note_id)
+    backlinks_raw = graph_service.get_backlinks(db, note_id)
     backlinks = [Backlink(note_id=b["note_id"], title=b["title"], type=b["type"]) for b in backlinks_raw]
 
     suggestions_raw = get_semantic_suggestions(db, note_id)
@@ -109,7 +102,7 @@ def get_note(note_id: int, db: Session = Depends(get_db)):
         content=note.content,
         created_at=note.created_at,
         updated_at=note.updated_at,
-        tags=node_tags.get(note_id) or extract_tags(note.content),
+        tags=graph_service.extract_tags(note.content),
         backlinks=backlinks,
         suggestions=suggestions,
         flashcards=[FlashcardResponse.model_validate(f) for f in flashcards],
@@ -123,13 +116,9 @@ def create_note(body: NoteCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(note)
 
-    tags = extract_tags(body.content)
-    neo4j_client.create_note_node(note.id, note.title, tags)
-
     if body.content.strip():
         update_note_embedding(note.id)
         db.refresh(note)
-        suggest_relationships(db, note)
 
     return note
 
@@ -150,7 +139,6 @@ def update_note(note_id: int, body: NoteUpdate, db: Session = Depends(get_db)):
     if body.content is not None and body.content.strip():
         update_note_embedding(note.id)
         db.refresh(note)
-        suggest_relationships(db, note)
 
     return note
 
@@ -162,7 +150,6 @@ def delete_note(note_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Note not found")
     db.delete(note)
     db.commit()
-    neo4j_client.delete_note_node(note_id)
     return {"ok": True}
 
 
@@ -170,8 +157,8 @@ def delete_note(note_id: int, db: Session = Depends(get_db)):
 
 
 @app.get("/api/graph", response_model=KnowledgeGraphResponse)
-def get_knowledge_graph():
-    data = neo4j_client.get_knowledge_graph()
+def get_knowledge_graph(db: Session = Depends(get_db)):
+    data = graph_service.build_graph(db)
     nodes = [NoteGraphNode(**n) for n in data["nodes"]]
     edges = [NoteGraphEdge(**e) for e in data["edges"]]
     return KnowledgeGraphResponse(nodes=nodes, edges=edges)
@@ -179,26 +166,20 @@ def get_knowledge_graph():
 
 @app.post("/api/graph/link")
 def create_link(source_id: int = Query(...), target_id: int = Query(...), weight: float = Query(1.0)):
-    neo4j_client.create_relationship(source_id, target_id, weight)
+    # The graph is derived from note content ([[wikilinks]] and shared
+    # hashtags), so explicit link storage is a no-op kept for API
+    # compatibility.
     return {"ok": True}
 
 
 @app.get("/api/tags")
 def list_tags(db: Session = Depends(get_db)):
-    tags = neo4j_client.get_all_tags()
-    if tags:
-        return tags
-    # Fall back to hashtags parsed from note content when the graph DB is unavailable.
-    seen = set()
-    for note in db.query(Note).all():
-        for t in extract_tags(note.content):
-            seen.add(t)
-    return sorted(seen)
+    return graph_service.get_all_tags(db)
 
 
 @app.get("/api/backlinks/{note_id}")
-def get_backlinks(note_id: int):
-    return neo4j_client.get_backlinks(note_id)
+def get_backlinks(note_id: int, db: Session = Depends(get_db)):
+    return graph_service.get_backlinks(db, note_id)
 
 
 # ─── Search ───────────────────────────────────────────────────────────────────
@@ -220,19 +201,29 @@ def search(
         .all()
     )
 
-    results = []
+    results = {}
     for note in notes:
         snippet = extract_snippet(note.content, q)
-        results.append(
-            SearchResult(
-                id=note.id,
-                title=note.title,
-                content_snippet=snippet,
-                score=1.0 if q.lower() in note.title.lower() else 0.5,
-                match_type="title" if q.lower() in note.title.lower() else "content",
-            )
+        results[note.id] = SearchResult(
+            id=note.id,
+            title=note.title,
+            content_snippet=snippet,
+            score=1.0 if q.lower() in note.title.lower() else 0.5,
+            match_type="title" if q.lower() in note.title.lower() else "content",
         )
-    return results
+
+    # Semantic layer: Gemini embeddings when available, TF-IDF otherwise.
+    for match in semantic_search(db, q, limit=10):
+        if match["id"] not in results:
+            results[match["id"]] = SearchResult(
+                id=match["id"],
+                title=match["title"],
+                content_snippet=extract_snippet(match["content"], q),
+                score=match["score"],
+                match_type="semantic",
+            )
+
+    return sorted(results.values(), key=lambda r: r.score, reverse=True)
 
 
 # ─── Flashcards ───────────────────────────────────────────────────────────────
@@ -270,11 +261,6 @@ def note_flashcards(note_id: int, db: Session = Depends(get_db)):
 # ─── Helpers ──────────────────────────────────────────────────────────────────
 
 
-def extract_tags(content: str) -> list:
-    hashtags = re.findall(r"#(\w+)", content)
-    return list(set(hashtags))
-
-
 def extract_snippet(content: str, query: str, context_chars: int = 120) -> str:
     idx = content.lower().find(query.lower())
     if idx == -1:
@@ -287,12 +273,6 @@ def extract_snippet(content: str, query: str, context_chars: int = 120) -> str:
     if end < len(content):
         snippet = snippet + "..."
     return snippet
-
-
-def suggest_relationships(db: Session, note: Note):
-    suggestions = get_semantic_suggestions(db, note.id, threshold=0.6, limit=3)
-    for s in suggestions:
-        neo4j_client.create_relationship(note.id, s["note_id"], weight=s["similarity_score"])
 
 
 # ─── Formatting ──────────────────────────────────────────────────────────────
@@ -346,11 +326,8 @@ async def upload_file(file: UploadFile = File(...), db: Session = Depends(get_db
     db.commit()
     db.refresh(note)
 
-    tags = extract_tags(body)
-    neo4j_client.create_note_node(note.id, note.title, tags)
     update_note_embedding(note.id)
     db.refresh(note)
-    suggest_relationships(db, note)
 
     return note
 
