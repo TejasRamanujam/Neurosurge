@@ -1,9 +1,10 @@
 """Vercel serverless entrypoint — imports the FastAPI app from backend/.
 
-Notes, tags, backlinks and spaced-repetition flashcards run against Neon
-Postgres (with pgvector). The Neo4j graph view, OpenAI semantic search /
-embeddings, and file-upload parsing are the degraded parts (they need those
-external services / keys); their imports are lazy so the app boots fine.
+Everything runs against Neon Postgres (with pgvector): notes, tags,
+backlinks, spaced-repetition flashcards, and the knowledge graph (derived
+from [[wikilinks]] and shared #hashtags — no graph database). Semantic
+search / suggestions use Gemini embeddings when GEMINI_API_KEY is set and
+fall back to pure-Python TF-IDF similarity when it isn't.
 """
 import os
 import sys

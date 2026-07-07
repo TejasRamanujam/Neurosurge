@@ -63,8 +63,8 @@ export default function KnowledgeGraphView({
   if (error) {
     return (
       <div className="empty-state">
-        <h3>Graph service is offline</h3>
-        <p>The knowledge graph needs its backing graph database, which isn't reachable right now. Your notes are safe — try again in a moment.</p>
+        <h3>Couldn't load the graph</h3>
+        <p>Something went wrong fetching your knowledge graph. Your notes are safe — try again in a moment.</p>
         <button className="graph-btn" onClick={loadGraph}>Try again</button>
       </div>
     )

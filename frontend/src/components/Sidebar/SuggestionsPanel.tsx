@@ -16,7 +16,7 @@ export default function SuggestionsPanel({ suggestions, onNavigate }: Suggestion
           <circle cx="19" cy="19" r="2" />
           <path d="M14 10l3.5-3.5M14 14l3.5 3.5M10 14l-3.5 3.5" />
         </svg>
-        <p>No related notes yet. Semantic suggestions need the AI service — they'll surface here when it's available.</p>
+        <p>No related notes yet. Write more and similar ideas will surface here automatically.</p>
       </div>
     )
   }
