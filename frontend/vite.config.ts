@@ -5,6 +5,12 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 5173,
-    proxy: { '/api': 'http://localhost:8001' },
+    proxy: {
+      '/api': {
+        target: 'https://tejas-neurosurge.vercel.app',
+        changeOrigin: true,
+        secure: true,
+      },
+    },
   },
 })
