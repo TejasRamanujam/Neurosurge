@@ -54,7 +54,7 @@ function UploadZone({ onUploaded }: { onUploaded: () => void }) {
       className={`dropzone${dragging ? ' dragging' : ''}`}
       role="button"
       tabIndex={0}
-      aria-label="Accession a PDF or Word document as a new note"
+      aria-label="Upload a PDF or Word document as a new note"
       onDragOver={(e) => { e.preventDefault(); setDragging(true) }}
       onDragLeave={() => setDragging(false)}
       onDrop={(e) => { e.preventDefault(); setDragging(false); if (e.dataTransfer.files.length) handleFiles(e.dataTransfer.files) }}
@@ -62,7 +62,7 @@ function UploadZone({ onUploaded }: { onUploaded: () => void }) {
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); inputRef.current?.click() } }}
     >
       <input ref={inputRef} type="file" accept=".pdf,.doc,.docx" multiple hidden onChange={(e) => { if (e.target.files?.length) handleFiles(e.target.files) }} />
-      {uploading ? 'Accessioning…' : 'Accession PDF / DOCX — drop or click'}
+      {uploading ? 'Uploading…' : 'Upload PDF / DOCX — drop or click'}
     </div>
   )
 }
@@ -258,7 +258,7 @@ export default function App() {
               <div className="catalogue-foot">
                 <button className="btn primary" onClick={handleCreate}>+ File a new entry</button>
                 <button className="btn quiet" onClick={() => setShowUpload((v) => !v)}>
-                  {showUpload ? 'Close accession' : 'Accession a document'}
+                  {showUpload ? 'Close upload' : 'Upload a document'}
                 </button>
                 {showUpload && <UploadZone onUploaded={() => { setShowUpload(false); loadNotes() }} />}
               </div>
