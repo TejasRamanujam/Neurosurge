@@ -7,7 +7,7 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/api': {
-        target: 'https://tejas-neurosurge.vercel.app',
+        target: 'https://neurosurge.vercel.app',
         changeOrigin: true,
         secure: true,
       },
