@@ -87,7 +87,21 @@ export default function Palette({
         </div>
         <div className="palette-body" role="listbox" aria-label="Search results">
           {!q.trim() && (
-            <p className="palette-note">Type to search every entry — exact matches and semantic neighbours (Gemini embeddings).</p>
+            <>
+              <p className="palette-note">Type to search every entry — exact matches and semantic neighbours (Gemini embeddings).</p>
+              <div className="palette-group">Try asking</div>
+              {['how do I remember things longer', 'searching by meaning', 'why link notes together'].map((ex) => (
+                <button
+                  key={ex}
+                  type="button"
+                  className="palette-note"
+                  style={{ display: 'block', width: '100%', textAlign: 'left', cursor: 'pointer', background: 'none', border: 'none' }}
+                  onClick={() => setQ(ex)}
+                >
+                  “{ex}”
+                </button>
+              ))}
+            </>
           )}
           {q.trim() !== '' && searched && !busy && ordered.length === 0 && (
             <p className="palette-note">Nothing in the index answers “{q}”.</p>
