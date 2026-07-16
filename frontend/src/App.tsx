@@ -1,7 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import Editor from './components/Editor'
-import AtlasGraph from './components/AtlasGraph'
-import Rehearsal from './components/Rehearsal'
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import Marginalia from './components/Marginalia'
 import Palette from './components/Palette'
 import {
@@ -11,6 +8,10 @@ import {
 import type { Note, NoteDetail, Flashcard } from './types'
 
 type Tab = 'index' | 'atlas' | 'rehearsal'
+const Editor = lazy(() => import('./components/Editor'))
+const AtlasGraph = lazy(() => import('./components/AtlasGraph'))
+const Rehearsal = lazy(() => import('./components/Rehearsal'))
+const MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 
 function CompassMark() {
   return (
@@ -37,6 +38,11 @@ function UploadZone({ onUploaded }: { onUploaded: () => void }) {
   const inputRef = useRef<HTMLInputElement>(null)
 
   async function handleFiles(files: FileList) {
+    const oversized = Array.from(files).find((file) => file.size > MAX_UPLOAD_BYTES)
+    if (oversized) {
+      alert(`${oversized.name} is larger than the 10 MB demo limit.`)
+      return
+    }
     setUploading(true)
     try {
       for (const file of Array.from(files)) await uploadFile(file)
@@ -209,6 +215,7 @@ export default function App() {
       </header>
 
       <div className={`folio${tab === 'index' ? ' index-view' : ''}`}>
+        <Suspense fallback={<div className="view-loading">Opening the folio…</div>}>
         {tab === 'index' && (
           <>
             <div className={`catalogue${listCollapsed ? ' collapsed' : ''}`}>
@@ -274,7 +281,12 @@ export default function App() {
                     Every note is a territory; every [[wikilink]] a surveyed route between them.
                     Write, connect, and rehearse — the atlas of your mind draws itself.
                   </p>
-                  <button className="btn primary" onClick={handleCreate}>+ File the first entry of the day</button>
+                  <div className="frontispiece-actions">
+                    <button className="btn primary" onClick={() => setTab('atlas')}>Explore the atlas</button>
+                    <button className="btn quiet" onClick={() => setPaletteOpen(true)}>Try semantic search</button>
+                    <button className="btn quiet" onClick={() => setTab('rehearsal')}>Begin rehearsal</button>
+                  </div>
+                  <button className="frontispiece-create" onClick={handleCreate}>+ File a new shared entry</button>
                 </div>
               )}
 
@@ -327,6 +339,7 @@ export default function App() {
         {tab === 'atlas' && <AtlasGraph onSelectNote={openNote} focusNoteId={selectedId} />}
 
         {tab === 'rehearsal' && <Rehearsal onReviewed={loadStats} />}
+        </Suspense>
       </div>
 
       <button className="mobile-consult" onClick={() => setPaletteOpen(true)} aria-label="Search notes">✦</button>
