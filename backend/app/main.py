@@ -40,10 +40,17 @@ app = FastAPI(title="Neurosurge — Personal Knowledge Graph & Second Brain", li
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=[
+        origin.strip()
+        for origin in os.environ.get(
+            "ALLOWED_ORIGINS",
+            "https://neurosurge.vercel.app,http://localhost:5173",
+        ).split(",")
+        if origin.strip()
+    ],
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type"],
 )
 
 
@@ -288,6 +295,7 @@ def format_text(content: str = Body(default="", embed=True)):
 
 
 SUPPORTED_UPLOAD_EXTENSIONS = list(SUPPORTED_EXTENSIONS.keys())
+MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 
 
 @app.get("/api/uploads/extensions")
@@ -305,7 +313,9 @@ async def upload_file(file: UploadFile = File(...), db: Session = Depends(get_db
             detail=f"Unsupported file type '{ext}'. Supported: {', '.join(SUPPORTED_UPLOAD_EXTENSIONS)}"
         )
 
-    content = await file.read()
+    content = await file.read(MAX_UPLOAD_BYTES + 1)
+    if len(content) > MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail="File exceeds the 10 MB demo limit")
     logger.info("Upload: %s (%d bytes, ext=%s)", filename, len(content), ext)
 
     if not content or len(content) == 0:
