@@ -6,6 +6,7 @@ import {
   uploadFile, fetchFlashcardStats,
 } from './api'
 import type { Note, NoteDetail, Flashcard } from './types'
+import { appendWikilink } from './wikilinks'
 
 type Tab = 'index' | 'atlas' | 'rehearsal'
 const Editor = lazy(() => import('./components/Editor'))
@@ -162,6 +163,13 @@ export default function App() {
     const t = linkTitle.trim().toLowerCase()
     const target = notes.find((n) => (n.title || '').trim().toLowerCase() === t)
     if (target) openNote(target.id)
+  }
+
+  function handleDraftRoute(linkTitle: string) {
+    const next = appendWikilink(content, linkTitle)
+    if (next === content) return
+    setContent(next)
+    setDirty(true)
   }
 
   // global shortcuts: ⌘K palette, ⌘S save
@@ -326,7 +334,9 @@ export default function App() {
             {detail && (
               <Marginalia
                 detail={detail}
+                currentContent={content}
                 onNavigate={openNote}
+                onDraftRoute={handleDraftRoute}
                 onCardCreated={(card: Flashcard) => {
                   setDetail((d) => (d ? { ...d, flashcards: [...d.flashcards, card] } : d))
                   loadStats()

@@ -1,14 +1,19 @@
 import { useEffect, useState } from 'react'
 import { createFlashcard, generateFlashcards } from '../api'
 import type { NoteDetail, Flashcard, FlashcardSuggestion } from '../types'
+import { hasWikilink } from '../wikilinks'
 
 export default function Marginalia({
   detail,
+  currentContent,
   onNavigate,
+  onDraftRoute,
   onCardCreated,
 }: {
   detail: NoteDetail
+  currentContent: string
   onNavigate: (id: number) => void
+  onDraftRoute: (title: string) => void
   onCardCreated: (card: Flashcard) => void
 }) {
   const [q, setQ] = useState('')
@@ -79,15 +84,29 @@ export default function Marginalia({
       <section className="margin-section">
         <h3 className="margin-title">Adjacent territory <span className="n">{detail.suggestions.length}</span></h3>
         {detail.suggestions.length === 0 && <p className="margin-empty">No nearby entries surveyed yet.</p>}
-        {detail.suggestions.map((s) => (
-          <button key={s.note_id} className="margin-item" onClick={() => onNavigate(s.note_id)}>
-            <span className="t">{s.title}</span>
-            <span className="m">
-              <span className="sim-meter" aria-hidden="true"><i style={{ width: `${Math.round(Math.min(1, Math.max(0, s.similarity_score)) * 100)}%` }} /></span>
-              {Math.round(Math.min(1, Math.max(0, s.similarity_score)) * 100)}%
-            </span>
-          </button>
-        ))}
+        {detail.suggestions.map((s) => {
+          const charted = hasWikilink(currentContent, s.title)
+          return (
+            <div className="route-candidate" key={s.note_id}>
+              <button className="margin-item" onClick={() => onNavigate(s.note_id)}>
+                <span className="t">{s.title}</span>
+                <span className="m">
+                  <span className="sim-meter" aria-hidden="true"><i style={{ width: `${Math.round(Math.min(1, Math.max(0, s.similarity_score)) * 100)}%` }} /></span>
+                  {Math.round(Math.min(1, Math.max(0, s.similarity_score)) * 100)}%
+                </span>
+              </button>
+              <button
+                className="route-draft"
+                type="button"
+                disabled={charted}
+                onClick={() => onDraftRoute(s.title)}
+                aria-label={`${charted ? 'Route already charted to' : 'Chart route to'} ${s.title}`}
+              >
+                {charted ? 'route charted' : '+ chart route'}
+              </button>
+            </div>
+          )
+        })}
       </section>
 
       <section className="margin-section">

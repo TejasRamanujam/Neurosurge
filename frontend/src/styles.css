@@ -781,6 +781,26 @@ input, textarea { font: inherit; color: inherit; }
   border-radius: 2px;
 }
 .margin-item:hover { background: var(--paper-high); }
+.route-candidate {
+  position: relative;
+  border-bottom: 1px solid var(--line-soft);
+  padding-bottom: 4px;
+  margin-bottom: 4px;
+}
+.route-candidate .margin-item { margin-bottom: 0; padding-right: 92px; }
+.route-draft {
+  position: absolute;
+  right: 0;
+  top: 10px;
+  font-family: var(--font-mono);
+  font-size: 8px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--vermilion-deep);
+  border-bottom: 1px solid currentColor;
+}
+.route-draft:hover:not(:disabled) { color: var(--survey); }
+.route-draft:disabled { color: var(--ink-faint); border-bottom-style: dotted; cursor: default; }
 .margin-item .t {
   font-family: var(--font-display);
   font-weight: 560;
