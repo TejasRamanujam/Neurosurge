@@ -1,4 +1,4 @@
-import type { Note, NoteDetail, KnowledgeGraph, SearchResult, Flashcard, FlashcardStats } from './types'
+import type { Note, NoteDetail, KnowledgeGraph, SearchResult, Flashcard, FlashcardStats, FlashcardSuggestion } from './types'
 
 const API = '/api'
 
@@ -74,6 +74,13 @@ export async function createFlashcard(noteId: number, question: string, answer: 
   return request<Flashcard>(`${API}/flashcards`, {
     method: 'POST',
     body: JSON.stringify({ note_id: noteId, question, answer }),
+  })
+}
+
+export async function generateFlashcards(noteId: number): Promise<FlashcardSuggestion[]> {
+  return request<FlashcardSuggestion[]>(`${API}/flashcards/generate`, {
+    method: 'POST',
+    body: JSON.stringify({ note_id: noteId }),
   })
 }
 

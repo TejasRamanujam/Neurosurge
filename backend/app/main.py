@@ -16,12 +16,17 @@ from app.models import Note, Flashcard
 from app.schemas import (
     NoteCreate, NoteUpdate, NoteResponse, NoteDetailResponse,
     KnowledgeGraphResponse, NoteGraphNode, NoteGraphEdge,
-    Suggestion, FlashcardCreate, FlashcardReview, FlashcardResponse,
+    Suggestion, FlashcardCreate, FlashcardGenerateRequest, FlashcardSuggestion,
+    FlashcardReview, FlashcardResponse,
     SearchResult, Backlink,
 )
 from app import graph_service
 from app.embedding_service import update_note_embedding
 from app.spaced_repetition import review_flashcard, get_due_flashcards, get_flashcard_stats
+from app.flashcard_generation import (
+    FlashcardGenerationUnavailable,
+    generate_flashcard_suggestions,
+)
 from app.suggestion_engine import get_semantic_suggestions, semantic_search
 from app.parsing_service import extract_text_from_file, SUPPORTED_EXTENSIONS
 from app.formatting_service import format_for_readability
@@ -253,6 +258,19 @@ def create_flashcard(body: FlashcardCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(card)
     return card
+
+
+@app.post("/api/flashcards/generate", response_model=list[FlashcardSuggestion])
+def generate_flashcards(body: FlashcardGenerateRequest, db: Session = Depends(get_db)):
+    note = db.query(Note).filter(Note.id == body.note_id).first()
+    if not note:
+        raise HTTPException(status_code=404, detail="Note not found")
+    if not note.content.strip():
+        raise HTTPException(status_code=422, detail="Add note content before drafting cards")
+    try:
+        return generate_flashcard_suggestions(note.title, note.content)
+    except FlashcardGenerationUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
 @app.post("/api/flashcards/{card_id}/review", response_model=FlashcardResponse)

@@ -55,6 +55,15 @@ class FlashcardCreate(BaseModel):
     answer: str
 
 
+class FlashcardGenerateRequest(BaseModel):
+    note_id: int
+
+
+class FlashcardSuggestion(BaseModel):
+    question: str
+    answer: str
+
+
 class FlashcardReview(BaseModel):
     rating: int
 

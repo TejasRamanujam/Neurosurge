@@ -51,6 +51,11 @@ export interface Flashcard {
   created_at: string
 }
 
+export interface FlashcardSuggestion {
+  question: string
+  answer: string
+}
+
 export interface SearchResult {
   id: number
   title: string

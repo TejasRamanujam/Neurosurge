@@ -128,12 +128,16 @@ export default function AtlasGraph({
   const rafRef = useRef(0)
   const dashRef = useRef(0)
   const reducedRef = useRef(false)
+  const graphFocusIdRef = useRef<number | null>(null)
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
   const [counts, setCounts] = useState({ notes: 0, routes: 0 })
   const [empty, setEmpty] = useState(false)
   const [hoverTitle, setHoverTitle] = useState<string | null>(null)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [graphFocusId, setGraphFocusId] = useState<number | null>(null)
+  const [nodeOptions, setNodeOptions] = useState<Array<{ id: number; title: string }>>([])
 
   const draw = useCallback(() => {
     const canvas = canvasRef.current
@@ -196,7 +200,17 @@ export default function AtlasGraph({
 
     const hovered = hoverRef.current
     const focused = focusIdxRef.current
-    const focusNode = focusNoteId != null ? sim.byId.get(focusNoteId) : undefined
+    const activeFocusId = graphFocusIdRef.current ?? focusNoteId
+    const focusNode = activeFocusId != null ? sim.byId.get(activeFocusId) : undefined
+    const focusedIndex = focusNode ? sim.nodes.findIndex((node) => node.id === focusNode.id) : -1
+    const neighborhood = new Set<number>()
+    if (focusedIndex >= 0) {
+      neighborhood.add(focusedIndex)
+      for (const edge of sim.edges) {
+        if (edge.a === focusedIndex) neighborhood.add(edge.b)
+        if (edge.b === focusedIndex) neighborhood.add(edge.a)
+      }
+    }
 
     const incident = new Set<number>()
     if (hovered >= 0) {
@@ -210,6 +224,8 @@ export default function AtlasGraph({
       const ax = na.x * k + tx, ay = na.y * k + ty
       const bx = nb.x * k + tx, by = nb.y * k + ty
       const hot = incident.has(i)
+      const inFocusedNeighborhood = focusedIndex < 0 || e.a === focusedIndex || e.b === focusedIndex
+      ctx.globalAlpha = inFocusedNeighborhood ? 1 : 0.12
       ctx.beginPath()
       ctx.moveTo(ax, ay)
       ctx.lineTo(bx, by)
@@ -226,6 +242,7 @@ export default function AtlasGraph({
       if (hot) ctx.lineWidth += 0.6
       ctx.stroke()
     }
+    ctx.globalAlpha = 1
     ctx.setLineDash([])
 
     // ---- nodes ----
@@ -237,6 +254,7 @@ export default function AtlasGraph({
       const isHover = i === hovered
       const isFocusKb = i === focused
       const isSelected = focusNode?.id === nd.id
+      ctx.globalAlpha = focusedIndex < 0 || neighborhood.has(i) ? 1 : 0.16
 
       // halo for hovered / selected
       if (isHover || isSelected || isFocusKb) {
@@ -284,6 +302,7 @@ export default function AtlasGraph({
         ctx.fillText(upper, sx, sy + r + 16)
       }
     }
+    ctx.globalAlpha = 1
   }, [focusNoteId])
 
   const loop = useCallback(() => {
@@ -305,6 +324,7 @@ export default function AtlasGraph({
       const g = await fetchGraph()
       const sim = buildSim(g)
       simRef.current = sim
+      setNodeOptions(sim.nodes.map((node) => ({ id: node.id, title: node.title })))
       autoFitRef.current = true
       setCounts({ notes: g.nodes.length, routes: g.edges.length })
       setEmpty(g.nodes.length === 0)
@@ -375,10 +395,37 @@ export default function AtlasGraph({
     }
   }
 
+  function clearGraphFocus() {
+    graphFocusIdRef.current = null
+    setGraphFocusId(null)
+    setSearchQuery('')
+    requestFrame()
+  }
+
+  function focusGraphNode(id: number) {
+    const sim = simRef.current
+    const canvas = canvasRef.current
+    const node = sim?.byId.get(id)
+    if (!sim || !canvas || !node) return
+    const dpr = window.devicePixelRatio || 1
+    const width = canvas.width / dpr
+    const height = canvas.height / dpr
+    const view = viewRef.current
+    view.k = Math.max(1.25, view.k)
+    view.tx = width / 2 - node.x * view.k
+    view.ty = height / 2 - node.y * view.k
+    autoFitRef.current = false
+    graphFocusIdRef.current = id
+    setGraphFocusId(id)
+    setSearchQuery(node.title)
+    requestFrame()
+  }
+
   function onPointerDown(e: React.PointerEvent) {
     const { sx, sy } = pos(e)
     canvasRef.current?.setPointerCapture(e.pointerId)
     const idx = hitNode(sx, sy)
+    if (idx < 0 && graphFocusIdRef.current !== null) clearGraphFocus()
     dragRef.current = { mode: idx >= 0 ? 'node' : 'pan', nodeIdx: idx, sx, sy, ox: sx, oy: sy, moved: false }
   }
 
@@ -454,6 +501,7 @@ export default function AtlasGraph({
       return
     } else if (e.key === 'Escape') {
       focusIdxRef.current = -1
+      clearGraphFocus()
     } else {
       return
     }
@@ -503,6 +551,48 @@ export default function AtlasGraph({
             arrows + enter to navigate<br />
             {hoverTitle ? <span style={{ color: 'var(--vermilion)' }}>▸ {hoverTitle}</span> : 'click a point to open it'}
           </div>
+        </div>
+      )}
+
+      {!loading && !error && !empty && (
+        <div className="atlas-search">
+          <label htmlFor="atlas-search-input">Find a territory</label>
+          <div className="atlas-search-row">
+            <input
+              id="atlas-search-input"
+              value={searchQuery}
+              onChange={(event) => {
+                graphFocusIdRef.current = null
+                setGraphFocusId(null)
+                setSearchQuery(event.target.value)
+                requestFrame()
+              }}
+              onKeyDown={(event) => {
+                if (event.key === 'Escape') {
+                  event.preventDefault()
+                  clearGraphFocus()
+                }
+              }}
+              placeholder="Search note titles…"
+              autoComplete="off"
+            />
+            {graphFocusId !== null && (
+              <button type="button" onClick={clearGraphFocus} aria-label="Clear atlas focus">×</button>
+            )}
+          </div>
+          {searchQuery.trim() && graphFocusId === null && (
+            <div className="atlas-search-results">
+              {nodeOptions
+                .filter((node) => node.title.toLowerCase().includes(searchQuery.trim().toLowerCase()))
+                .slice(0, 6)
+                .map((node) => (
+                  <button type="button" key={node.id} onClick={() => focusGraphNode(node.id)}>
+                    <span>No. {String(node.id).padStart(3, '0')}</span>
+                    {node.title}
+                  </button>
+                ))}
+            </div>
+          )}
         </div>
       )}
 
