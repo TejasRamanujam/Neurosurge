@@ -23,11 +23,6 @@ try:
 except ImportError:
     pdfminer_extract = None
 
-try:
-    from pypdf import PdfReader
-except ImportError:
-    PdfReader = None
-
 
 def _clean_control_chars(text: str) -> str:
     cleaned = []
@@ -88,18 +83,6 @@ def extract_text_from_pdf(content: bytes) -> Optional[str]:
         if text:
             logger.info("fitz extracted %d chars", len(text))
             return text
-
-    if PdfReader is not None:
-        try:
-            reader = PdfReader(io.BytesIO(content))
-            pages = [(page.extract_text() or "") for page in reader.pages]
-            text = _clean_control_chars("\n".join(pages))
-            text = re.sub(r"\n{3,}", "\n\n", text).strip()
-            if len(text) >= 10:
-                logger.info("pypdf extracted %d chars", len(text))
-                return text
-        except Exception as e:
-            logger.warning("pypdf failed: %s", e)
 
     if pdfminer_extract is not None:
         try:
