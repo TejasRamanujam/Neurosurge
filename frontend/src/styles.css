@@ -416,16 +416,6 @@ input, textarea { font: inherit; color: inherit; }
 }
 .sheet-status.dirty { color: var(--vermilion); }
 
-.tag-chip {
-  font-family: var(--font-mono);
-  font-size: 9.5px;
-  letter-spacing: 0.08em;
-  color: var(--survey);
-  border: 1px solid rgba(46, 90, 82, 0.35);
-  padding: 2px 7px;
-  border-radius: 99px;
-}
-
 .title-input {
   width: 100%;
   border: none;
@@ -1346,14 +1336,6 @@ input, textarea { font: inherit; color: inherit; }
 @keyframes shimmer { to { background-position: -200% 0; } }
 .skeleton.line { height: 14px; margin: 14px 16px; }
 .skeleton.line.short { width: 55%; }
-
-.vh {
-  position: absolute;
-  width: 1px; height: 1px;
-  clip-path: inset(50%);
-  overflow: hidden;
-  white-space: nowrap;
-}
 
 .mobile-list-toggle { display: none; }
 

@@ -8,7 +8,6 @@ TF-IDF path in similarity_service — the features keep working either way.
 """
 import logging
 import math
-import re
 
 import httpx
 
@@ -48,32 +47,6 @@ def generate_embedding(text: str):
     except Exception:
         logger.warning("Gemini embedding request failed; falling back", exc_info=True)
         return None
-
-
-def chunk_text(text: str, max_chars: int = 2000) -> list:
-    chunks = []
-    sections = re.split(r'(?=^#{1,3}\s)', text, flags=re.MULTILINE)
-    for section in sections:
-        section = section.strip()
-        if not section:
-            continue
-        if len(section) <= max_chars:
-            chunks.append(section)
-        else:
-            words = section.split()
-            current = []
-            length = 0
-            for word in words:
-                if length + len(word) + 1 > max_chars:
-                    chunks.append(" ".join(current))
-                    current = [word]
-                    length = len(word)
-                else:
-                    current.append(word)
-                    length += len(word) + 1
-            if current:
-                chunks.append(" ".join(current))
-    return chunks
 
 
 def update_note_embedding(note_id: int):

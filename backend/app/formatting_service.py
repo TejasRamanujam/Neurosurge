@@ -18,10 +18,6 @@ def detect_bullet(line: str) -> bool:
     )
 
 
-def detect_numbered(line: str) -> bool:
-    return bool(re.match(r"^\d+[\).]\s", line.strip()))
-
-
 def detect_header(line: str) -> bool:
     s = line.strip()
     if not s:
@@ -35,15 +31,6 @@ def detect_header(line: str) -> bool:
     if re.match(r"^(Section|Chapter|Part|Step|Phase)\s+\d", s, re.IGNORECASE):
         return True
     if re.match(r"^[A-Z][a-z]+(\s[A-Z][a-z]+){1,4}$", s) and len(s) < 60:
-        return True
-    return False
-
-
-def detect_paragraph_break(line: str) -> bool:
-    s = line.strip()
-    if not s:
-        return True
-    if len(s) < 15 and s.endswith((".", "!", "?", ":", ";")):
         return True
     return False
 

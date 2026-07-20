@@ -5,7 +5,6 @@ similarity. Fallback path (no GEMINI_API_KEY / API failure): pure-Python
 TF-IDF cosine over the notes table. Both paths return the same shapes, so
 the API works — with ranked results — in either configuration.
 """
-import math
 
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -14,15 +13,6 @@ from app.models import Note
 from app.config import settings
 from app.embedding_service import ensure_note_embeddings, get_embedding_for_text
 from app.similarity_service import rank_by_similarity
-
-
-def cosine_similarity(a: list, b: list) -> float:
-    dot = sum(x * y for x, y in zip(a, b))
-    norm_a = math.sqrt(sum(x * x for x in a))
-    norm_b = math.sqrt(sum(y * y for y in b))
-    if norm_a == 0 or norm_b == 0:
-        return 0.0
-    return dot / (norm_a * norm_b)
 
 
 def _pgvector_neighbors(db: Session, embedding, exclude_id: int, threshold: float, limit: int):
@@ -124,7 +114,3 @@ def semantic_search(db: Session, query: str, limit: int = 10) -> list:
         {"id": doc_id, "title": by_id[doc_id].title, "content": by_id[doc_id].content, "score": score}
         for doc_id, score in ranked[:limit]
     ]
-
-
-def generate_related_notes(db: Session, note_id: int, limit: int = 5) -> list:
-    return get_semantic_suggestions(db, note_id, limit=limit)
