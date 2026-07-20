@@ -48,16 +48,6 @@ export async function fetchGraph(): Promise<KnowledgeGraph> {
   return request<KnowledgeGraph>(`${API}/graph`)
 }
 
-export async function createLink(sourceId: number, targetId: number, weight?: number): Promise<void> {
-  await fetch(`${API}/graph/link?source_id=${sourceId}&target_id=${targetId}&weight=${weight ?? 1.0}`, {
-    method: 'POST',
-  })
-}
-
-export async function fetchTags(): Promise<string[]> {
-  return request<string[]>(`${API}/tags`)
-}
-
 export async function searchNotes(q: string): Promise<SearchResult[]> {
   return request<SearchResult[]>(`${API}/search?q=${encodeURIComponent(q)}`)
 }
@@ -89,10 +79,6 @@ export async function reviewFlashcard(cardId: number, rating: number): Promise<F
     method: 'POST',
     body: JSON.stringify({ rating }),
   })
-}
-
-export async function fetchNoteFlashcards(noteId: number): Promise<Flashcard[]> {
-  return request<Flashcard[]>(`${API}/flashcards/note/${noteId}`)
 }
 
 export async function formatContent(content: string): Promise<string> {
